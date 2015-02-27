@@ -1,0 +1,81 @@
+---
+
+- name: build monitors
+  hosts: buildmonitors
+  tasks:
+
+  - command: fallocate --length 512M /swap creates=/swap
+    register: swapfile
+
+  - command: mkswap /swap
+    when: swapfile|changed
+
+  - command: swapon /swap
+    when: swapfile|changed
+
+  - copy: src=files/etc/locale.gen dest=/etc/locale.gen owner=root group=root mode=0644
+    register: locale
+
+  - command: locale-gen
+    when: locale|changed
+
+  - copy: src=files/etc/locale.conf dest=/etc/locale.conf owner=root group=root mode=0644
+
+  - copy: src=files/etc/vconsole.conf dest=/etc/vconsole.conf owner=root group=root mode=0644
+
+  - file: src=files/usr/share/zoneinfo/Europe/London dest=/etc/localtime owner=root group=root state=link force=yes
+
+  # no hardware clock on the rpi
+  #- command: hwclock --systohc --utc --adjfile /etc/adjtime creates=/etc/adjtime
+
+  - copy: src=files/etc/hostname dest=/etc/hostname owner=root group=root mode=0644
+
+  - copy: src=files/etc/hosts dest=/etc/hosts owner=root group=root mode=0644
+ 
+  - group: name=fred gid=1000 state=present
+
+  - user: name=fred comment="Fred The Cat" uid=1000 group=fred groups=users createhome=yes home=/home/fred shell=/bin/bash password="$6$HjbSNXTd$rzmSrO2h7z2HTBmafGFUOGuZcXiqj7jpIQ7Ag33YVG5i7T7VRBzz2vycwmTURCB3fZZpAYE9eYVeJXXeXICLF." state=present
+
+  - pacman: update_cache=yes
+
+  - command: /usr/bin/pacman --noconfirm -Syu
+
+  - pacman: name=xf86-video-fbdev state=present
+
+  - pacman: name={{ item }} state=present
+    with_items:
+      - xorg-server
+      - xorg-server-utils
+      - xorg-xinit
+
+  - copy: src=files/etc/X11/xorg.conf.d/10-keyboard.conf dest=/etc/X11/xorg.conf.d/10-keyboard.conf owner=root group=root mode=0644
+
+  - pacman: name={{ item }} state=present
+    with_items:
+      - alsa-utils
+      - alsa-firmware
+      - alsa-lib
+      - alsa-plugins
+  
+  - pacman: name=xterm state=present
+
+  - pacman: name=openbox state=present
+  
+  - copy: src=files/etc/xdg/openbox/rc.xml dest=/etc/xdg/openbox/rc.xml owner=root group=root mode=0644
+
+  - pacman: name=ttf-dejavu state=present
+
+  - copy: src=files/dot/{{ item }} dest=/home/fred/.{{ item }} owner=fred group=fred mode=0644
+    with_items:
+      - bash_profile
+      - xinitrc
+
+  - file: path=/etc/systemd/system/getty@tty1.service.d owner=root group=root mode=0755 state=directory
+
+  - copy: src=files/etc/systemd/system/getty@tty1.service.d/autologin.conf dest=/etc/systemd/system/getty@tty1.service.d/autologin.conf owner=root group=root mode=0644
+
+  - pacman: name={{ item }} state=present
+    with_items:
+        - midori
+
+  - copy: src=files/boot/config.txt dest=/boot/config.txt owner=root group=root mode=0755
